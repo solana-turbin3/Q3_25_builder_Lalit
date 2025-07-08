@@ -15,7 +15,7 @@ This repository contains all my weekly assignments, learnings, and project progr
 📄 [Read More →](./week-1/README.md)
 
 ### Week 2:
-_(To be updated)_
+made the first anchor program of vault 
 
 ---
 
