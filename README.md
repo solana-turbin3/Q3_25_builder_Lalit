@@ -21,15 +21,4 @@ made the first anchor program of vault
 
 ## 📁 Structure
 
-I initially completed and pushed the Turbine Q3 assignment to my personal GitHub repo(turbine Q3), thinking it would be reviewed from there.
-Later, I realized it needed to be submitted under the organization’s repo, so I created it and re-submitted the full code, including the Anchor Vault class.
-Apologies for the oversight — I’ve attended all sessions, practiced thoroughly, and I truly value this course.
-Repo links: Personal--https://github.com/lalitcap23/TurbineQ3?tab=readme-ov-file 
- Org--github.com/solana-turbin3/Q3_25_builder_Lalit
-
-
-
-https://github.com/lalitcap23/TurbineQ3?tab=readme-ov-file
-
-https://github.com/solana-turbin3/Q3_25_builder_Lalit
 
