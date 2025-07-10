@@ -59,7 +59,6 @@ pub mod anchor_vault {
     }
 }
 
-
 #[account]
 pub struct Vault {
     pub authority: Pubkey,
@@ -76,6 +75,7 @@ pub struct Initialize<'info> {
 
     #[account(mut)]
     pub authority: Signer<'info>,
+
     pub system_program: Program<'info, System>,
 }
 
@@ -102,7 +102,6 @@ pub struct Close<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 }
-
 #[error_code]
 pub enum VaultError {
     #[msg("Unauthorized access.")]
@@ -112,4 +111,3 @@ pub enum VaultError {
     #[msg("Math overflow.")]
     Overflow,
 }
-
