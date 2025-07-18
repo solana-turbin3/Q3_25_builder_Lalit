@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 
 declare_id!("39AzeK3okakk8JgggwnXhK45ZSoEJ9LNyXpwB1WgSg3S");
 
+
 #[program]
 pub mod anchor_vault {
     use super::*;
@@ -68,8 +69,10 @@ pub struct Vault {
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(init, payer = authority, space = 8 + 32 + 8, seeds = [b"vault", authority.key().as_ref()], bump)]
+    /// CHECK: I’ll check this account manually in the code
     pub vault: Account<'info, Vault>,
 
+    /// CHECK: I’ll check this account manually in the code
     #[account(mut, seeds = [b"vault_account", authority.key().as_ref()], bump)]
     pub vault_account: AccountInfo<'info>,
 
@@ -83,7 +86,8 @@ pub struct Initialize<'info> {
 pub struct Payment<'info> {
     #[account(mut, seeds = [b"vault", authority.key().as_ref()], bump)]
     pub vault: Account<'info, Vault>,
-
+    
+/// CHECK: This account holds lamports and is accessed securely via seeds + bump
     #[account(mut, seeds = [b"vault_account", authority.key().as_ref()], bump)]
     pub vault_account: AccountInfo<'info>,
 
@@ -95,7 +99,7 @@ pub struct Payment<'info> {
 pub struct Close<'info> {
     #[account(mut, close = authority, seeds = [b"vault", authority.key().as_ref()], bump)]
     pub vault: Account<'info, Vault>,
-
+    /// CHECK: Vault account manually validated by seeds + bump, only holds lamports
     #[account(mut, seeds = [b"vault_account", authority.key().as_ref()], bump)]
     pub vault_account: AccountInfo<'info>,
 
