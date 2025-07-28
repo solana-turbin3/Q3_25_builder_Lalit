@@ -5,12 +5,9 @@ use anchor_spl::{
     token_interface::{
         close_account, transfer_checked, CloseAccount, Mint, TokenAccount, TokenInterface,
         TransferChecked,
-    },
+    }
 };
 
-use crate::state::Escrow;
-
-#[derive(Accounts)]
 pub struct Take<'info> {
     #[account(mut)]
     pub taker: Signer<'info>,
@@ -118,5 +115,6 @@ impl<'info> Take<'info> {
         );
 
         close_account(cpi_cxt)
-    }
+    }       
+        
 }
