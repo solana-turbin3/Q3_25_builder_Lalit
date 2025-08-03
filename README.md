@@ -15,10 +15,16 @@ This repository contains all my weekly assignments, learnings, and project progr
 📄 [Read More →](./week-1/README.md)
 
 ### Week 2:
-made the first anchor program of vault 
-testing the upstream
-
+did some vault ,escrow
 ---
+##week 3
+Amm and capstone guiding \
+#week 4
+some nft staking 
+Dice 
+user_story for the capstone 
+
+# week 5 
 
 ## 📁 Structure
 
