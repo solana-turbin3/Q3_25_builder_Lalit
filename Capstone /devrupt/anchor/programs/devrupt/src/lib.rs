@@ -10,12 +10,11 @@ pub use instructions::*;
 pub use state::*;
 
 declare_id!("FV5sGyF543uGgyJdgfdsQhNGXrGkxY4wsBT5h4tcpjPN");
-
 #[program]
 pub mod devrupt {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        initialize::handler(ctx)
+        initialize_contributor(ctx)
     }
 }
