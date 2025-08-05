@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, TokenAccount, Token, mint_to, MintTo};
-use mpl_token_metadata::instruction::create_metadata_accounts_v3;
-use crate::state::*;
+use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::token_2022::{Token2022, spl_token_2022::extension::ExtensionType};
+use anchor_spl::token_interface::{mint_to, MintTo};
+use mpl_token_metadata::types::DataV2;
+se mpl_token_metadata::instructions::{CreateMetadataAccountV3, CreateMetadataAccountV3InstructionArgs};
 
 #[derive(Accounts)]
 #[instruction(cid: String)]
@@ -10,112 +12,110 @@ pub struct MintSbt<'info> {
     pub payer: Signer<'info>,
 
     #[account(
-        mut,
-        seeds = [b"contributor", payer.key().as_ref()],
-        bump = contributor_state.bump,
+        init,
+        payer = payer,
+        mint::decimals = 0,
+        mint::authority = payer.key(),
+        mint::freeze_authority = payer.key(),
+        extensions = [ExtensionType::NonTransferable],// ADD TOKEN EXTENSIONS HERE
+        seeds = [b"mint", payer.key().as_ref()],
+        bump,
     )]
-    pub contributor_state: Account<'info, ContributorState>,
+    pub mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
 
     #[account(
         init,
         payer = payer,
-        mint::decimals = 0,
-        mint::authority = payer,
-        mint::freeze_authority = payer,
-    )]
-    pub mint: Account<'info, Mint>,
-
-    /// CHECK: PDA for metadata
-    #[account(mut)]
-    pub metadata: UncheckedAccount<'info>,
-
-    #[account(
-        init_if_needed,
-        payer = payer,
         associated_token::mint = mint,
         associated_token::authority = payer,
+        associated_token::token_program = token_program,
     )]
-    pub token_account: Account<'info, TokenAccount>,
+    pub token_account: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
 
-    pub token_program: Program<'info, Token>,
-    pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info, Rent>,
-
-    // Future reward mint (optional)
+    /// CHECK: Metadata account derived from mint
     #[account(
         mut,
-        seeds = [b"reward_mint"],
-        bump
+        seeds = [
+            b"metadata",
+            mpl_token_metadata::ID.as_ref(),
+            mint.key().as_ref(),
+        ],
+        bump,
+        seeds::program = mpl_token_metadata::ID
     )]
-    pub reward_mint: Account<'info, Mint>,
+    pub metadata: UncheckedAccount<'info>,
 
-    #[account(
-        init_if_needed,
-        payer = payer,
-        associated_token::mint = reward_mint,
-        associated_token::authority = payer,
-    )]
-    pub reward_token_account: Account<'info, TokenAccount>,
+    /// CHECK: This is the Token Metadata Program
+    #[account(address = mpl_token_metadata::ID)]
+    pub token_metadata_program: UncheckedAccount<'info>,
+
+    pub token_program: Program<'info, Token2022>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 pub fn handler(ctx: Context<MintSbt>, cid: String) -> Result<()> {
-    let contributor = &mut ctx.accounts.contributor_state;
+    let mint = &ctx.accounts.mint;
+    let token_account = &ctx.accounts.token_account;
 
-    // Update contribution count
-    contributor.total_contributions += 1;
+    // Mint 1 SBT to user's token account
+    mint_to(
+        CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            MintTo {
+                mint: mint.to_account_info(),
+                to: token_account.to_account_info(),
+                authority: ctx.accounts.payer.to_account_info(),
+            },
+        ),
+        1,
+    )?;
 
-    // Mint the SBT
-    let cpi_accounts = MintTo {
-        mint: ctx.accounts.mint.to_account_info(),
-        to: ctx.accounts.token_account.to_account_info(),
-        authority: ctx.accounts.payer.to_account_info(),
+    // Create metadata
+    let data_v2 = DataV2 {
+        name: format!("Soulbound Cert {}", cid),
+        symbol: "SBT".to_string(),
+        uri: format!("https://gateway.pinata.cloud/ipfs/{}", cid),
+        seller_fee_basis_points: 0,
+        creators: None,
+        collection: None,
+        uses: None,
     };
-    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
-    mint_to(cpi_ctx, 1)?;
 
-    // Create metadata for SBT
-    let metadata_ix = create_metadata_accounts_v3(
-        mpl_token_metadata::ID,
-        ctx.accounts.metadata.key(),
-        ctx.accounts.mint.key(),
-        ctx.accounts.payer.key(),
-        ctx.accounts.payer.key(),
-        ctx.accounts.payer.key(),
-        format!("Devrupt PR SBT #{}", contributor.total_contributions),
-        "DEV-SBT".to_string(),
-        format!("ipfs://{}", cid),
-        None,
-        0,
-        true,
-        false,
-        None,
-        None,
-        None,
+    let create_metadata_ix = mpl_token_metadata::instructions::CreateMetadataAccountV3 {
+        metadata: ctx.accounts.metadata.key(),
+        mint: mint.key(),
+        mint_authority: ctx.accounts.payer.key(),
+        payer: ctx.accounts.payer.key(),
+        update_authority: (ctx.accounts.payer.key(), true),
+        system_program: ctx.accounts.system_program.key(),
+        rent: Some(ctx.accounts.rent.key()),
+    };
+
+    let instruction = create_metadata_ix.instruction(
+        mpl_token_metadata::instructions::CreateMetadataAccountV3InstructionArgs {
+            data: data_v2,
+            is_mutable: false,
+            collection_details: None,
+        },
     );
-    invoke(
-        &metadata_ix,
+
+    anchor_lang::solana_program::program::invoke(
+        &instruction,
         &[
             ctx.accounts.metadata.to_account_info(),
-            ctx.accounts.mint.to_account_info(),
+            mint.to_account_info(),
+            ctx.accounts.payer.to_account_info(),
+            ctx.accounts.payer.to_account_info(),
             ctx.accounts.payer.to_account_info(),
             ctx.accounts.system_program.to_account_info(),
+            ctx.accounts.rent.to_account_info(),
         ],
     )?;
 
-    // 🎁 REWARD LOGIC and might be implement in the future but current goal of the project
-    if contributor.total_contributions % 5 == 0 {
-        // Mint a reward token (NFT/SBT/FT based on reward_mint)
-        let reward_ctx = CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
-            MintTo {
-                mint: ctx.accounts.reward_mint.to_account_info(),
-                to: ctx.accounts.reward_token_account.to_account_info(),
-                authority: ctx.accounts.payer.to_account_info(),
-            },
-        );
-        mint_to(reward_ctx, 1)?;
-        contributor.total_rewards += 1;
-    }
+    // NO NEED TO FREEZE - NonTransferable extension handles this automatically!
+    // The token is inherently non-transferable due to the extension
 
     Ok(())
 }
