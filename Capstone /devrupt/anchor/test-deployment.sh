@@ -11,7 +11,7 @@ echo "📋 Current Configuration:"
 solana config get
 
 echo ""
-echo "💰 Current Balance:"
+echo " Current Balance:"
 solana balance
 
 echo ""
@@ -39,3 +39,8 @@ echo "Program: https://explorer.solana.com/address/$PROGRAM_ID?cluster=devnet"
 echo "Your Wallet: https://explorer.solana.com/address/$(solana address)?cluster=devnet"
 echo ""
 echo "🎉 SBT Program Successfully Deployed and Ready for Use!"
+echo ""
+echo "🧪 Running Anchor Tests:"
+echo "========================"
+echo "Running: anchor test --skip-local-validator"
+anchor test --skip-local-validator
