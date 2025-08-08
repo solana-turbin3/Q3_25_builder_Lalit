@@ -13,7 +13,6 @@ pub struct MintSbt<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    // Add contributor state validation
     #[account(
         mut,
         seeds = [b"contributor", payer.key().as_ref()],
@@ -28,7 +27,7 @@ pub struct MintSbt<'info> {
         mint::authority = payer.key(),
         mint::freeze_authority = payer.key(),
         mint::token_program = token_program,
-        seeds = [b"mint", payer.key().as_ref(), cid.as_bytes()],
+        seeds = [b"mint", payer.key().as_ref(), contributor_state.total_rewards.to_le_bytes().as_ref()],
         bump,
     )]
     pub mint: InterfaceAccount<'info, Mint>,
@@ -42,17 +41,8 @@ pub struct MintSbt<'info> {
     )]
     pub token_account: InterfaceAccount<'info, TokenAccount>,
 
-    /// CHECK: Metadata account derived from mint
-    #[account(
-        mut,
-        seeds = [
-            b"metadata",
-            mpl_token_metadata::ID.as_ref(),
-            mint.key().as_ref(),
-        ],
-        bump,
-        seeds::program = mpl_token_metadata::ID
-    )]
+    /// CHECK: Metadata account - will be computed and validated in handler
+    #[account(mut)]
     pub metadata: UncheckedAccount<'info>,
 
     /// CHECK: This is the Token Metadata Program
@@ -70,14 +60,29 @@ pub fn handler(ctx: Context<MintSbt>, cid: String) -> Result<()> {
     let token_account = &ctx.accounts.token_account;
     let contributor_state = &mut ctx.accounts.contributor_state;
 
-    // Minimum contributions before minting
+    // Minimum contributions before minting 
     require!(
         contributor_state.total_contributions >= 1,
         crate::error::ErrorCode::InsufficientContributions
     );
 
-    // Increment rewards counter (this creates unique seeds for next mint)
+    // Increment reward counter first for the pda
     contributor_state.total_rewards += 1;
+
+    // Verify the metadata PDA is correct
+    let (expected_metadata_pda, _) = Pubkey::find_program_address(
+        &[
+            b"metadata",
+            mpl_token_metadata::ID.as_ref(),
+            mint.key().as_ref(),
+        ],
+        &mpl_token_metadata::ID,
+    );
+
+    require!(
+        ctx.accounts.metadata.key() == expected_metadata_pda,
+        crate::error::ErrorCode::InvalidMetadataPDA
+    );
 
     // Initialize NonTransferable extension for this new mint
     let init_non_transferable_ix = spl_token_2022::instruction::initialize_non_transferable_mint(
@@ -90,7 +95,7 @@ pub fn handler(ctx: Context<MintSbt>, cid: String) -> Result<()> {
         &[mint.to_account_info()],
     )?;
 
-    // Mint 1 SBT to user's token account
+    // Mint 1 SBT to user's token acc
     mint_to(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
@@ -114,7 +119,7 @@ pub fn handler(ctx: Context<MintSbt>, cid: String) -> Result<()> {
         uses: None,
     };
 
-    // Create metadata using CPI
+    // Creating metadata using CPI
     let ix = CreateMetadataAccountV3 {
         metadata: ctx.accounts.metadata.key(),
         mint: ctx.accounts.mint.key(),
@@ -144,9 +149,10 @@ pub fn handler(ctx: Context<MintSbt>, cid: String) -> Result<()> {
     )?;
 
     msg!(
-        "🎉 Minted SBT #{} for contributor: {}",
+        "🎉 Minted SBT #{} for contributor: {} with CID: {}",
         contributor_state.total_rewards,
-        contributor_state.github_username
+        contributor_state.github_username,
+        cid
     );
 
     Ok(())
