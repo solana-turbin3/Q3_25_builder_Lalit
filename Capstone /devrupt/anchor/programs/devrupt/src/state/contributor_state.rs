@@ -8,3 +8,5 @@ pub struct ContributorState {
     pub total_rewards: u64,
     pub bump: u8,
 }
+
+

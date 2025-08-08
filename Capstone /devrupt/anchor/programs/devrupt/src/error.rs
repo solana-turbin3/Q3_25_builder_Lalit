@@ -7,4 +7,7 @@ pub enum ErrorCode {
 
     #[msg("Insufficient contributions to mint certificate")]
     InsufficientContributions,
+
+    #[msg("Invalid metadata PDA provided")]
+    InvalidMetadataPDA,
 }
