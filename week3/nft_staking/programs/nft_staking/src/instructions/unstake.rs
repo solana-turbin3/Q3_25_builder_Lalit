@@ -1,81 +1,89 @@
-use anchor_lang::{accounts::program, prelude::*};
+use crate::state::*;
+use anchor_lang::prelude::*;
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token::{transfer, Mint, Token, TokenAccount, Transfer},
+};
 
 #[derive(Accounts)]
-pub struct Unstake<'info>{
-  #[account(mut)]
+pub struct Unstake<'info> {
+    #[account(mut)]
     pub user: Signer<'info>,
 
-    pub mint: Account<'info,Mint>,
-    
     #[account(
         mut,
-        associated_token::mint = mint,
-        associated_token::authority = user,
+        seeds = [b"user", user.key().as_ref()],
+        bump = user_account.bump
     )]
-    pub mint_ata: Account<'info,TokenAccount>,
+    pub user_account: Account<'info, UserAccount>,
 
     #[account(
-        seeds= [
-            b"metadata",
-            metadata_program.key().as_ref(),
-            mint.key().as_ref()
-        ],
-        seeds::program = metadata_program.key(),
-        bump,
-        constraint = metadata.collection.as_ref().unwrap().key.as_ref() == collection_mint.key().as_ref(),
-        constraint = metadata.collection.as_ref().unwrap().verified == true,
+        seeds = [b"config"],
+        bump = config.bump
     )]
-    pub metadata: Account<'info,MetadataAccount>,
+    pub config: Account<'info, StakeConfig>,
 
-    #[account(
-        seeds= [
-            b"metadata",
-            metadata_program.key().as_ref(),
-            mint.key().as_ref(),
-            b"edition"
-        ],
-        seeds::program = metadata_program.key(),
-        bump,
-        constraint = metadata.collection.as_ref().unwrap().key.as_ref() == collection_mint.key().as_ref(),
-        constraint = metadata.collection.as_ref().unwrap().verified == true,
-    )]
-    pub edition: Account<'info,MetadataAccount>,
-
-    #[account(
-    seeds = [b"config"],
-    bump = config.bump
-   )]
-   pub config:Account<'info,StakeConfig>,
-
-   #[account(
-    mut,
-    seeds = [b"user",user.key().as_ref()],
-    bump = user_account.bump
-    )]
-    pub user_account: Account<'info,UserAccount>,
+    pub nft_mint: Account<'info, Mint>,
 
     #[account(
         mut,
         close = user,
-        seeds = [b"stake",mint.key().as_ref(),config.key().as_ref()],
-        bump,
+        seeds = [b"stake", nft_mint.key().as_ref()],
+        bump = stake_account.bump,
+        constraint = stake_account.owner == user.key(),
     )]
-    pub stake:Account<'info,StakeAccount>,
+    pub stake_account: Account<'info, StakeAccount>,
 
-    pub system_program:Program<'info,System>,
-    pub token_program:Program<'info,Token>,
-    pub metadata_program:Program<'info,Metadata>,
+    #[account(
+        mut,
+        associated_token::mint = nft_mint,
+        associated_token::authority = user,
+    )]
+    pub user_nft_ata: Account<'info, TokenAccount>,
 
+    #[account(
+        mut,
+        associated_token::mint = nft_mint,
+        associated_token::authority = config,
+    )]
+    pub vault_ata: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+    pub clock: Sysvar<'info, Clock>,
 }
 
-impl <'info>Unstake<'info> {
-    pub fn unstake(&mut self) -> Result<()>{
-        let time_elapsed = ((Clock::get()?.unix_timestamp-self.stake.staked_at)/86400) as u32;
-        require!(time_elapsed>self.config.freeze_period,StakeError::TimeElapsedError);
-        self.config.points+=self_config.points_per_stake*time_elapsed;
-        
-        let program = self.token_program.to_account_info();
+impl<'info> Unstake<'info> {
+    pub fn unstake(&mut self) -> Result<()> {
+        let clock = Clock::get()?;
 
-        todo!()
+        let stake_time = clock.unix_timestamp - self.stake_account.stake_at;
+        if stake_time < self.config.freeze_period as i64 {
+            return Err(anchor_lang::error::ErrorCode::ConstraintRaw.into());
+        }
+
+        let points_earned = (stake_time as u64) * (self.config.points_per_stake as u64);
+
+        self.user_account.amount_staked = self.user_account.amount_staked.saturating_sub(1);
+        self.user_account.points = self.user_account.points.saturating_add(points_earned as u32);
+
+        let config_seeds = &[b"config".as_ref(), &[self.config.bump]];
+        let signer_seeds = &[&config_seeds[..]];
+
+        let cpi_accounts = Transfer {
+            from: self.vault_ata.to_account_info(),
+            to: self.user_nft_ata.to_account_info(),
+            authority: self.config.to_account_info(),
+        };
+
+        let cpi_ctx = CpiContext::new_with_signer(
+            self.token_program.to_account_info(),
+            cpi_accounts,
+            signer_seeds,
+        );
+        transfer(cpi_ctx, 1)?;
+
+        Ok(())
     }
 }

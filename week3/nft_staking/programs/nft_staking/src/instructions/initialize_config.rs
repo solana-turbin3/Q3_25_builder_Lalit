@@ -1,50 +1,50 @@
-use anchor_lang::{prelude::*, solana_program::example_mocks::solana_sdk::sysvar::rewards};
+use crate::state::*;
+use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
-
-use crate::{initialize_config, stake_config};
 
 #[derive(Accounts)]
 pub struct InitializeConfig<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
-    
+
     #[account(
         init,
         payer = admin,
-        seeds = [b"stake"],
+        seeds = [b"config"],
         bump,
-        space = 8 + stake_config::INIT_SPACE,
+        space = 8 + StakeConfig::INIT_SPACE,
     )]
-    pub config: Account<'info, stake_config>,
-    
+    pub config: Account<'info, StakeConfig>,
+
     #[account(
-        init_if_needed,
-        payer= admin,
-        seeds= [b"reward_mint",config.key().as_ref()],
+        init,
+        payer = admin,
+        seeds = [b"rewards", config.key().as_ref()],
         bump,
         mint::decimals = 6,
-        mint::authority=config
+        mint::authority = config,
     )]
     pub reward_mint: Account<'info, Mint>,
+
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> InitializeConfig<'info> {
     pub fn initialize_config(
         &mut self,
-        point_per_stake: u8,
-        max_stake: u8,
-        freeze_point: u8,
-        rewards_bump: u8,
-        bump: &InitializeConfigBumps,
+        points_per_stake: u8,
+        max_unstake: u8,
+        freeze_period: u32,
+        bumps: InitializeConfigBumps,
     ) -> Result<()> {
         self.config.set_inner(StakeConfig {
-            point_per_stake,
-            max_stake,
-            freeze_point,
-            reward_bump: rewards_bump,
-            bump: bump.config,
+            points_per_stake,
+            max_unstake,
+            freeze_period,
+            rewards_bump: bumps.reward_mint,
+            bump: bumps.config,
         });
         Ok(())
     }
