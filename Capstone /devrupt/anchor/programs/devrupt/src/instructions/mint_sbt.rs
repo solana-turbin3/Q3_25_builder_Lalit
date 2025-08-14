@@ -10,9 +10,7 @@ pub struct MintSbt<'info> {
     pub payer: Signer<'info>,
 
     #[account(
-        init_if_needed,
-        payer = payer,
-        space = 8 + 32 + 4 + 20 + 8 + 8 + 1, 
+        mut,
         seeds = [b"contributor", payer.key().as_ref()],
         bump
     )]
@@ -40,18 +38,10 @@ pub struct MintSbt<'info> {
 }
 
 impl<'info> MintSbt<'info> {
-    pub fn process(&mut self, cid: String, bumps: &MintSbtBumps) -> Result<()> {
+    pub fn process(&mut self, cid: String, _bumps: &MintSbtBumps) -> Result<()> {
         let contributor = &mut self.contributor_state;
 
-        // Initialize contributor 
-        if contributor.total_contributions == 0 {
-            contributor.wallet = self.payer.key();
-            contributor.total_contributions = 0;
-            contributor.total_rewards = 0;
-            contributor.bump = bumps.contributor_state;
-        }
-
-        // Increment contributions
+        // Increment contributions and rewards
         contributor.total_contributions += 1;
         contributor.total_rewards += 1;
 
@@ -59,17 +49,12 @@ impl<'info> MintSbt<'info> {
             mint: self.mint.to_account_info(),
             to: self.contributor_ata.to_account_info(),
             authority: self.payer.to_account_info(),
-        }; 
+        };
 
         let cpi_ctx = CpiContext::new(self.token_program.to_account_info(), cpi_accounts);
         anchor_spl::token::mint_to(cpi_ctx, 1)?;
 
-        contributor.total_rewards += 1;
-
-        msg!(
-            "Minted SBT for contributor with CID: {}",
-            cid
-        );
+        msg!("Minted SBT for contributor with CID: {}", cid);
 
         Ok(())
     }
@@ -78,4 +63,3 @@ impl<'info> MintSbt<'info> {
 pub fn mint_sbt_handler(ctx: Context<MintSbt>, cid: String) -> Result<()> {
     ctx.accounts.process(cid, &ctx.bumps)
 }
-

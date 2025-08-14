@@ -6,13 +6,16 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-devrupt = "FV5sGyF543uGgyJdgfdsQhNGXrGkxY4wsBT5h4tcpjPN"
+devrupt = "CDqBjq2XPTdCzuzQnk5eMmRUPt1tkc2J7GKEnNANtdQv"
+
+[programs.devnet]
+devrupt = "CDqBjq2XPTdCzuzQnk5eMmRUPt1tkc2J7GKEnNANtdQv"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

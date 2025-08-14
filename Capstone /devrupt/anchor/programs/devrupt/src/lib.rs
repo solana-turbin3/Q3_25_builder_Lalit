@@ -9,7 +9,7 @@ pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("BDKNwmmBKF8myFod94Lm4qVHzGoEHwCHhAMcovZzNCKG");
+declare_id!("CDqBjq2XPTdCzuzQnk5eMmRUPt1tkc2J7GKEnNANtdQv");
 
 #[program]
 pub mod devrupt {
