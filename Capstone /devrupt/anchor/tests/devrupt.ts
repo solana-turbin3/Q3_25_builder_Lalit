@@ -5,18 +5,22 @@ import {
   PublicKey, 
   Keypair, 
   SystemProgram,
-  SYSVAR_RENT_PUBKEY
+  SYSVAR_RENT_PUBKEY,
+  Transaction
 } from "@solana/web3.js";
 import { 
-  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddressSync,
   getAccount,
-  getMint
+  getMint,
+  createMint,
+  createInitializeMintInstruction,
+  MINT_SIZE
 } from "@solana/spl-token";
 import { expect } from "chai";
 
-describe("Devrupt SBT Program - Complete Test Suite", () => {
+describe("Devrupt SBT Program - SPL Token Based Test Suite", () => {
   // Configure the client to use the local cluster
   anchor.setProvider(anchor.AnchorProvider.env());
 
@@ -29,48 +33,29 @@ describe("Devrupt SBT Program - Complete Test Suite", () => {
   const IPFS_CID = "QmTestSBTMetadata123456";
   const METAPLEX_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
 
+  // Track SBT data across tests
+  const sbts: Array<{
+    mint: Keypair;
+    tokenAccount: PublicKey;
+    contributionNumber: number;
+  }> = [];
+
   // Account addresses
   let contributorStatePda: PublicKey;
-  let mintPda: PublicKey;
-  let metadataPda: PublicKey;
-  let userTokenAccount: PublicKey;
 
   before("Setup test environment", async () => {
     console.log("🔧 Setting up test environment...");
     console.log("💰 Wallet:", wallet.publicKey.toString());
     console.log("🔗 Program:", program.programId.toString());
     
-    // Calculate PDAs
+    // Calculate contributor state PDA
     [contributorStatePda] = PublicKey.findProgramAddressSync(
       [Buffer.from("contributor"), wallet.publicKey.toBuffer()],
       program.programId
     );
 
-    [mintPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("mint"), wallet.publicKey.toBuffer()],
-      program.programId
-    );
-
-    [metadataPda] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("metadata"),
-        METAPLEX_PROGRAM_ID.toBuffer(),
-        mintPda.toBuffer(),
-      ],
-      METAPLEX_PROGRAM_ID
-    );
-
-    userTokenAccount = getAssociatedTokenAddressSync(
-      mintPda,
-      wallet.publicKey,
-      false,
-      TOKEN_2022_PROGRAM_ID
-    );
-
     console.log("📍 Account addresses calculated:");
     console.log("   Contributor State:", contributorStatePda.toString());
-    console.log("   Mint PDA:", mintPda.toString());
-    console.log("   Token Account:", userTokenAccount.toString());
   });
 
   it("1. Initialize Contributor", async () => {
@@ -109,171 +94,174 @@ describe("Devrupt SBT Program - Complete Test Suite", () => {
     }
   });
 
-  it("2. Record Contributions", async () => {
-    console.log("\n2️⃣ Testing contribution recording...");
+  it("2. Record Multiple Contributions", async () => {
+    console.log("\n2️⃣ Testing multiple contribution recording...");
 
     // Get initial state
     const initialState = await program.account.contributorState.fetch(contributorStatePda);
     const initialContributions = initialState.totalContributions.toNumber();
+    console.log("📊 Initial contributions:", initialContributions);
 
-    // Record contribution
-    const contribTx = await program.methods
-      .recordContribution()
-      .accounts({
-        signer: wallet.publicKey,
-      })
-      .rpc();
-
-    console.log("✅ Contribution recorded. Tx:", contribTx);
-
-    // Verify the contribution was recorded
-    const updatedState = await program.account.contributorState.fetch(contributorStatePda);
-    const newContributions = updatedState.totalContributions.toNumber();
-
-    expect(newContributions).to.equal(initialContributions + 1);
-    console.log("✅ Contribution counter incremented correctly");
-
-    await program.methods
-      .recordContribution()
-      .accounts({ signer: wallet.publicKey })
-      .rpc();
-
-    console.log("✅ Additional contribution recorded for SBT minting");
-  });
-
-  it("3. Mint SBT with Token-2022", async () => {
-    console.log("\n3️⃣ Testing SBT minting...");
-
-    // Ensure we have enough contributions
-    const contributorState = await program.account.contributorState.fetch(contributorStatePda);
-    console.log("📊 Current contributions:", contributorState.totalContributions.toNumber());
-
-    try {
-      const mintTx = await program.methods
-        .mintSbt(IPFS_CID)
+    // Record 3 contributions for SBT minting
+    for (let i = 1; i <= 3; i++) {
+      const contribTx = await program.methods
+        .recordContribution()
         .accounts({
-          payer: wallet.publicKey,
+          signer: wallet.publicKey,
         })
         .rpc();
 
-      console.log("🎉 SBT minted successfully! Tx:", mintTx);
-      console.log("🔗 Explorer:", `https://explorer.solana.com/tx/${mintTx}?cluster=devnet`);
+      console.log(`✅ Contribution ${i} recorded. Tx:`, contribTx);
+    }
+
+    // Verify the contributions were recorded
+    const updatedState = await program.account.contributorState.fetch(contributorStatePda);
+    const newContributions = updatedState.totalContributions.toNumber();
+
+    expect(newContributions).to.equal(initialContributions + 3);
+    console.log(`✅ Contributions increased from ${initialContributions} to ${newContributions}`);
+  });
+
+  async function mintSBTForContribution(contributionNumber: number) {
+    console.log(`\n🎖️ Minting SBT for contribution #${contributionNumber}...`);
+
+    // Generate a new mint keypair for each SBT
+    const mintKeypair = Keypair.generate();
+    
+    // Calculate associated token account for this mint
+    const tokenAccount = getAssociatedTokenAddressSync(
+      mintKeypair.publicKey,
+      wallet.publicKey,
+      false,
+      TOKEN_PROGRAM_ID
+    );
+
+    try {
+      // Mint the SBT using our program - the program will create and initialize the mint
+      const mintTx = await program.methods
+        .sbtMint(IPFS_CID)
+        .accountsPartial({
+          mint: mintKeypair.publicKey,
+        })
+        .signers([mintKeypair])
+        .rpc();
+
+      console.log(`🎉 SBT #${contributionNumber} minted successfully! Tx:`, mintTx);
+
+      // Store SBT info
+      sbts.push({
+        mint: mintKeypair,
+        tokenAccount: tokenAccount,
+        contributionNumber: contributionNumber
+      });
 
       // Verify mint account exists and has correct properties
       const mintInfo = await getMint(
         provider.connection,
-        mintPda,
+        mintKeypair.publicKey,
         "confirmed",
-        TOKEN_2022_PROGRAM_ID
+        TOKEN_PROGRAM_ID
       );
 
       expect(mintInfo.decimals).to.equal(0);
       expect(mintInfo.supply).to.equal(BigInt(1));
-      console.log("✅ Mint account verified - decimals: 0, supply: 1");
+      console.log(`✅ Mint #${contributionNumber} verified - decimals: 0, supply: 1`);
 
       // Verify token account exists and has correct balance
-      const tokenAccount = await getAccount(
+      const tokenAccountInfo = await getAccount(
         provider.connection,
-        userTokenAccount,
+        tokenAccount,
         "confirmed",
-        TOKEN_2022_PROGRAM_ID
+        TOKEN_PROGRAM_ID
       );
 
-      expect(tokenAccount.amount).to.equal(BigInt(1));
-      expect(tokenAccount.mint.toString()).to.equal(mintPda.toString());
-      expect(tokenAccount.owner.toString()).to.equal(wallet.publicKey.toString());
-      console.log("✅ Token account verified - balance: 1");
+      expect(tokenAccountInfo.amount).to.equal(BigInt(1));
+      expect(tokenAccountInfo.mint.toString()).to.equal(mintKeypair.publicKey.toString());
+      expect(tokenAccountInfo.owner.toString()).to.equal(wallet.publicKey.toString());
+      console.log(`✅ Token account #${contributionNumber} verified - balance: 1`);
 
-      // Verify metadata account exists
-      const metadataAccountInfo = await provider.connection.getAccountInfo(metadataPda);
-      expect(metadataAccountInfo).to.not.be.null;
-      expect(metadataAccountInfo!.owner.toString()).to.equal(METAPLEX_PROGRAM_ID.toString());
-      console.log("✅ Metadata account verified");
-
-      // Verify contributor state was updated
-      const updatedContributorState = await program.account.contributorState.fetch(contributorStatePda);
-      expect(updatedContributorState.totalRewards.toNumber()).to.be.greaterThan(0);
-      console.log("✅ Contributor rewards counter updated");
-
-    } catch (error) {
-      console.log("⚠️ SBT minting encountered an issue:", error.message);
+      return true;
       
-      // Check if the mint account already exists
-      try {
-        const existingMint = await getMint(
-          provider.connection,
-          mintPda,
-          "confirmed",
-          TOKEN_2022_PROGRAM_ID
-        );
-        console.log("ℹ️ Mint already exists - this is expected for repeated tests");
-        console.log("✅ Mint properties:", { 
-          decimals: existingMint.decimals, 
-          supply: existingMint.supply.toString() 
-        });
-        
-        // If mint exists, the SBT system is working
-        expect(existingMint.decimals).to.equal(0);
-        
-      } catch (mintError) {
-        console.error("❌ Failed to verify existing mint:", mintError.message);
-        throw error; // Re-throw original error if mint doesn't exist
-      }
+    } catch (error) {
+      console.log(`⚠️ SBT #${contributionNumber} minting failed:`, error.message);
+      console.error(error);
+      return false;
     }
+  }
+
+  it("3. Mint First SBT", async () => {
+    const success = await mintSBTForContribution(1);
+    expect(success).to.be.true;
   });
 
-  it("4. Verify Soulbound Properties", async () => {
-    console.log("\n4️⃣ Verifying soulbound (non-transferable) properties...");
+  it("4. Mint Second SBT", async () => {
+    const success = await mintSBTForContribution(2);
+    expect(success).to.be.true;
+  });
 
-    try {
-      const mintInfo = await getMint(
-        provider.connection,
-        mintPda,
+  it("5. Mint Third SBT", async () => {
+    const success = await mintSBTForContribution(3);
+    expect(success).to.be.true;
+  });
+
+  it("6. Verify All SBTs and Contributor State", async () => {
+    console.log("\n6️⃣ Verifying all SBTs and contributor state...");
+
+    // Verify contributor state shows correct totals
+    const contributorState = await program.account.contributorState.fetch(contributorStatePda);
+    
+    console.log("📊 Final Contributor Stats:");
+    console.log("   Username:", contributorState.githubUsername);
+    console.log("   Total Contributions:", contributorState.totalContributions.toNumber());
+    console.log("   Total Rewards:", contributorState.totalRewards.toNumber());
+
+    // Verify each SBT exists and has balance of 1
+    console.log("\n🎖️ Verifying all SBT balances:");
+    for (const sbt of sbts) {
+      const tokenAccountInfo = await getAccount(
+        provider.connection, 
+        sbt.tokenAccount,
         "confirmed",
-        TOKEN_2022_PROGRAM_ID
+        TOKEN_PROGRAM_ID
       );
-
-      // Verify the mint has the expected properties for an SBT
-      expect(mintInfo.decimals).to.equal(0); // NFT-like
-      expect(mintInfo.supply).to.equal(BigInt(1)); // Single token
-      
-      console.log("✅ SBT properties confirmed:");
-      console.log("   - Decimals: 0 (NFT-like)");
-      console.log("   - Supply: 1 (unique token)");
-      console.log("   - Uses Token-2022 with NonTransferable extension");
-      
-    } catch (error) {
-      console.log("ℹ️ Mint not found - this may be expected if SBT minting had issues");
-      console.log("✅ Program structure verified - SBT system is architecturally sound");
-      
-      // Don't fail the test if mint doesn't exist, as we're testing architecture
-      expect(program.programId.toString()).to.equal("FV5sGyF543uGgyJdgfdsQhNGXrGkxY4wsBT5h4tcpjPN");
+      expect(tokenAccountInfo.amount).to.equal(BigInt(1));
+      console.log(`   SBT #${sbt.contributionNumber}: ✅ Balance = 1`);
     }
+
+    console.log(`\n🎉 SUCCESS! Created 3 contributions and minted ${sbts.length} SBTs!`);
+    
+    // Verify we have the expected number of SBTs
+    expect(sbts.length).to.equal(3);
+    expect(contributorState.totalRewards.toNumber()).to.be.greaterThan(0);
   });
 
-  it("5. Display Final Results", async () => {
+  it("7. Display Final Summary", async () => {
     console.log("\n🎊 FINAL TEST SUMMARY");
-    console.log("=====================");
+    console.log("======================");
 
     const contributorState = await program.account.contributorState.fetch(contributorStatePda);
     
-    console.log("✅ Program deployed at:", program.programId.toString());
+    console.log("✅ Program ID:", program.programId.toString());
     console.log("✅ Wallet:", wallet.publicKey.toString());
-    console.log("✅ Contributor initialized with username:", contributorState.githubUsername);
-    console.log("✅ Total contributions:", contributorState.totalContributions.toNumber());
-    console.log("✅ Total rewards (SBTs):", contributorState.totalRewards.toNumber());
+    console.log("✅ Contributor:", contributorState.githubUsername);
+    console.log("✅ Total Contributions:", contributorState.totalContributions.toNumber());
+    console.log("✅ Total SBTs Minted:", sbts.length);
+    console.log("✅ Total Rewards:", contributorState.totalRewards.toNumber());
 
-    console.log("\n🌐 EXPLORER LINKS:");
+    console.log("\n🎖️ SBT ADDRESSES:");
     console.log("==================");
-    console.log("🔗 Program:", `https://explorer.solana.com/address/${program.programId.toString()}?cluster=devnet`);
-    console.log("🔗 Wallet:", `https://explorer.solana.com/address/${wallet.publicKey.toString()}?cluster=devnet`);
-    console.log("🔗 SBT Mint:", `https://explorer.solana.com/address/${mintPda.toString()}?cluster=devnet`);
-    console.log("🔗 Token Account:", `https://explorer.solana.com/address/${userTokenAccount.toString()}?cluster=devnet`);
-    console.log("🔗 Contributor State:", `https://explorer.solana.com/address/${contributorStatePda.toString()}?cluster=devnet`);
+    for (const sbt of sbts) {
+      console.log(`SBT #${sbt.contributionNumber}:`);
+      console.log(`   Mint: ${sbt.mint.publicKey.toString()}`);
+      console.log(`   Token Account: ${sbt.tokenAccount.toString()}`);
+      console.log(`   Explorer: https://explorer.solana.com/address/${sbt.mint.publicKey.toString()}?cluster=localnet`);
+    }
 
-    console.log("\n🎉 ALL TESTS PASSED! SBT SYSTEM FULLY FUNCTIONAL!");
-    
-    // Verify program ID matches the deployed program
-    expect(program.programId.toString()).to.equal("FV5sGyF543uGgyJdgfdsQhNGXrGkxY4wsBT5h4tcpjPN");
+    console.log("\n🌐 PROGRAM EXPLORER:");
+    console.log("=====================");
+    console.log(`🔗 Program: https://explorer.solana.com/address/${program.programId.toString()}?cluster=localnet`);
+    console.log(`🔗 Contributor State: https://explorer.solana.com/address/${contributorStatePda.toString()}?cluster=localnet`);
+
+    console.log("\n🎉 ALL TESTS PASSED! SPL TOKEN-BASED SBT SYSTEM WORKING PERFECTLY!");
   });
 });

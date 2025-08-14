@@ -9,7 +9,7 @@ pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("FV5sGyF543uGgyJdgfdsQhNGXrGkxY4wsBT5h4tcpjPN");
+declare_id!("BDKNwmmBKF8myFod94Lm4qVHzGoEHwCHhAMcovZzNCKG");
 
 #[program]
 pub mod devrupt {
@@ -19,14 +19,14 @@ pub mod devrupt {
         ctx: Context<InitializeContributor>,
         github_username: String,
     ) -> Result<()> {
-        instructions::initialize_contributor::handler(ctx, github_username)
+        instructions::initialize_contributor::initialize_contributor_handler(ctx, github_username)
     }
 
-        pub fn sbt_mint(ctx: Context<sbtmint>, cid: String) -> Result<()> {
-        instructions::sbt_mint::handler(ctx, cid)
+    pub fn sbt_mint(ctx: Context<MintSbt>, cid: String) -> Result<()> {
+        instructions::mint_sbt::mint_sbt_handler(ctx, cid)
     }
 
     pub fn record_contribution(ctx: Context<RecordContribution>) -> Result<()> {
-        instructions::record_contribution::handler(ctx)
+        instructions::record_contribution::record_contribution_handler(ctx)
     }
 }

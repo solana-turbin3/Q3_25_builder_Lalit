@@ -19,7 +19,10 @@ pub struct InitializeContributor<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<InitializeContributor>, github_username: String) -> Result<()> {
+pub fn initialize_contributor_handler(
+    ctx: Context<InitializeContributor>,
+    github_username: String,
+) -> Result<()> {
     let contributor = &mut ctx.accounts.contributor_state;
 
     contributor.wallet = ctx.accounts.payer.key();

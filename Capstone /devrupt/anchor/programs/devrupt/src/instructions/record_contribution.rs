@@ -1,5 +1,5 @@
-use anchor_lang::prelude::*;
 use crate::state::*;
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct RecordContribution<'info> {
@@ -14,7 +14,7 @@ pub struct RecordContribution<'info> {
     pub contributor_state: Account<'info, ContributorState>,
 }
 
-pub fn handler(ctx: Context<RecordContribution>) -> Result<()> {
+pub fn record_contribution_handler(ctx: Context<RecordContribution>) -> Result<()> {
     let contributor = &mut ctx.accounts.contributor_state;
 
     contributor.total_contributions += 1;
