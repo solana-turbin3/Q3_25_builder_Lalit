@@ -1,111 +1,88 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_2022 as spl2022;
-use anchor_spl::token_2022::Token2022;
-use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
-
+use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::token::{Mint, Token, TokenAccount, MintTo};
+use crate::contributor_state;
 use crate::state::ContributorState;
 
 #[derive(Accounts)]
-pub struct MintSbt<'info> {
-    #[account(mut)]
+#[instruction(amount: u64)]
+
+pub struct MintSbt<'info>{
+
+ #[account(mut)]
     pub payer: Signer<'info>,
 
-    #[account(
-        mut,
-        seeds = [b"contributor", payer.key().as_ref()],
-        bump = contributor_state.bump
-    )]
-    pub contributor_state: Account<'info, ContributorState>,
-
-    #[account(
-        seeds = [b"mint_auth", contributor_state.key().as_ref()],
+        #[account(
+         init_if_needed,
+        payer = payer,
+        space = 8 + 32 + 4 + github_username.len() + 8 + 8 + 1,
+        seeds = [b"contributor", contributor_state.key().as_ref()],
         bump
     )]
-    /// CHECK: PDA signer only, no data stored
-    pub mint_authority: UncheckedAccount<'info>,
+    pub contributor_state: Account<'info, ContributorState>,
+   
+   #[account(mut)]
+    pub mint: Account<'info, Mint>,
 
-    #[account(
+      #[account(
         init,
         payer = payer,
-        seeds = [
-            b"mint",
-            contributor_state.key().as_ref(),
-            &contributor_state.total_rewards.to_le_bytes()
-        ],
-        bump,
-        mint::decimals = 0,
-        mint::authority = mint_authority,
-        mint::freeze_authority = mint_authority,
-        mint::token_program = token_program
+        associated_token::mint = mint,
+        associated_token::authority = contributor
     )]
-    pub mint: InterfaceAccount<'info, Mint>,
+    pub contributor: SystemAccount<'info>,
+    pub contributor_ata: Account<'info, TokenAccount>,
 
-    #[account(
-        init,
-        payer = payer,
-        seeds = [
-            b"token",
-            contributor_state.key().as_ref(),
-            mint.key().as_ref()
-        ],
-        bump,
-        token::mint = mint,
-        token::authority = mint_authority,
-        token::token_program = token_program
-    )]
-    pub token_account: InterfaceAccount<'info, TokenAccount>,
-
-    pub token_program: Program<'info, Token2022>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
-}
+ 
 
-impl<'info> MintSbt<'info> {
-    pub fn process(&mut self) -> Result<()> {
-        require!(
-            self.contributor_state.total_contributions >= 1,
-            crate::error::ErrorCode::InsufficientContributions
-        );
+ impl<'info> MintSbt<'info>{
 
-        let mint_auth_bump = *self
-            .__account_bumps
-            .get("mint_authority")
-            .ok_or(crate::error::ErrorCode::MissingBump)?;
+    pub fn process(&mut self, github_username: String) -> Result<()> {
+        let contributor = &mut self.contributor_state;
 
-        let signer_seeds: &[&[u8]] = &[
-            b"mint_auth",
-            self.contributor_state.key().as_ref(),
-            &[mint_auth_bump],
-        ];
+        // Initialize contributor state if not already initialized
+        if contributor.total_contributions == 0 {
+            contributor.wallet = self.payer.key();
+            contributor.github_username = github_username;
+            contributor.total_contributions = 0;
+            contributor.total_rewards = 0;
+            contributor.bump = self.bumps.contributor_state;
+        }
 
-        let cpi_accounts = spl2022::MintTo {
-            mint: self.mint.to_account_info(),
-            to: self.token_account.to_account_info(),
-            authority: self.mint_authority.to_account_info(),
-        };
-        let cpi_program = self.token_program.to_account_info();
-        let cpi_ctx =
-            CpiContext::new_with_signer(cpi_program, cpi_accounts, &[signer_seeds]);
+        // Increment contributions
+        contributor.total_contributions += 1;
 
-        spl2022::mint_to(cpi_ctx, 1)?;
+      let cpi_account= MintTo{
+        mint: self.mint.to_account_info(),
+        to: self.contributor_ata.to_account_info(),
+        authority: Self::to_account_info(),
+      }; 
 
-        self.contributor_state.total_rewards = self
-            .contributor_state
-            .total_rewards
-            .checked_add(1)
-            .ok_or(crate::error::ErrorCode::Overflow)?;
+    let cpi_ctx= CpiContext::new (self.token_program.to_account_info(),cpi_accounts)
+     mint_to(cpi_ctx, 1)?;
+
+
+     contributor_state.total_rewards += 1;
 
         msg!(
-            "SBT minted (#{}) into PDA token account {}.",
-            self.contributor_state.total_rewards,
-            self.token_account.key()
+            "Minted SBT for contributor: {} with CID: {}",
+            contributor.github_username,
+            cid
         );
 
-        Ok(())
+       
     }
+    
+    Ok(())
+
+
+
+ }
+
 }
-
-
-
 
 
 
@@ -411,4 +388,3 @@ impl<'info> MintSbt<'info> {
 
 //     Ok(())
 // }
-

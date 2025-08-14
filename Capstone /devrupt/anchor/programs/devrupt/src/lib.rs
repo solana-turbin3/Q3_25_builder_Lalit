@@ -4,8 +4,6 @@ pub mod instructions;
 pub mod state;
 
 use anchor_lang::prelude::*;
-use anchor_spl::token_2022::{Mint, Token2022, TokenInterface};
-use spl_token_2022::extension::non_transferable::{NonTransferable, NonTransferableAccount};
 
 pub use constants::*;
 pub use instructions::*;
@@ -25,7 +23,7 @@ pub mod devrupt {
     }
 
     pub fn mint_sbt(ctx: Context<MintSbt>, cid: String) -> Result<()> {
-        ctx.accounts.process(cid)
+        instructions::mint_sbt::handler(ctx, cid)
     }
 
     pub fn record_contribution(ctx: Context<RecordContribution>) -> Result<()> {
