@@ -1,5 +1,5 @@
 use crate::state::*;
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, Bumps};
 
 #[derive(Accounts)]
 pub struct InitializeUser<'info> {
@@ -20,6 +20,7 @@ pub struct InitializeUser<'info> {
     pub system_program: Program<'info, System>,
 }
 
+
 impl<'info> InitializeUser<'info> {
     /// Initialize user's staking account with default values
     pub fn initialize_user(&mut self, bumps: InitializeUserBumps) -> Result<()> {
@@ -31,3 +32,4 @@ impl<'info> InitializeUser<'info> {
         Ok(())
     }
 }
+
