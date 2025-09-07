@@ -21,8 +21,7 @@ pub mod devrupt {
     ) -> Result<()> {
         instructions::initialize_contributor::initialize_contributor_handler(ctx, github_username)
     }
-
-    pub fn sbt_mint(ctx: Context<MintSbt>, cid: String) -> Result<()> {
+pub fn mint_sbt(ctx: Context<MintSbt>, cid: String) -> Result<()> {
         instructions::mint_sbt::mint_sbt_handler(ctx, cid)
     }
 

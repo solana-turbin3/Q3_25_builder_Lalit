@@ -15,7 +15,7 @@ devrupt = "CDqBjq2XPTdCzuzQnk5eMmRUPt1tkc2J7GKEnNANtdQv"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

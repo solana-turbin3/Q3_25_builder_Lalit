@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 pub struct RewardLog {
     pub contributor: Pubkey,
     pub repo: String,
-    pub pr_number: u64,
+    pub total_contributions: u64,
     pub reward: u64,
     pub timestamp: i64,
 }
