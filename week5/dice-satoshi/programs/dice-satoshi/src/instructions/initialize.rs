@@ -18,7 +18,7 @@ pub struct Initialize<'info> {
 }
 impl<'info> Initialize<'info> {
     pub fn init(&mut self, amount: u64) -> Result<()> {
-        let ctx: CpiContext<'_, '_, '_, '_, Transfer> = CpiContext::new(
+        let ctx: CpiContext<'_, '_, '_, '_, _> = CpiContext::new(
             self.system_program.to_account_info(),
             Transfer {
                 from: self.house.to_account_info(),
