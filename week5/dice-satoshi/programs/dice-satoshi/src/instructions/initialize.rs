@@ -1,7 +1,7 @@
-use anchor_lang
-::{accounts::{account, program}, prelude::*, system_program::{transfer, Transfer}
+use anchor_lang::{
+    prelude::*,
+    system_program::{transfer, Transfer},
 };
-
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(mut)]
@@ -25,7 +25,7 @@ impl<'info> Initialize<'info> {
                 to: self.vault.to_account_info(),
             },
         );
-
+ 
         transfer(ctx, amount)?;
 
         Ok(())
