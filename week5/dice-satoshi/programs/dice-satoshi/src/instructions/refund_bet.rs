@@ -10,4 +10,4 @@ pub struct RefundBet<'info> {
 
     /// CHECK: This is only used for signing purpose
     pub house: UncheckedAccount<'info>,
-}
+} 
