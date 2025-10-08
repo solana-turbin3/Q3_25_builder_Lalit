@@ -44,7 +44,7 @@ impl<'info> PlaceBet<'info>{
  ) -> Result<()>{
     self.bet.set_inner(Bet{
            slot: Clock::get()?.slot as u8, // This truncates the value!
-        player: self.player.key(),
+        player: self.player.key(), 
         seed,
         roll,
         amount,
