@@ -11,10 +11,8 @@ pub struct Initialize<'info> {
     seeds = [b"vault",house.key().as_ref()],
     bump,
     )]
-
     pub vault: SystemAccount<'info>,
-   pub system_program: Program<'info, System>,
-
+    pub system_program: Program<'info, System>,
 }
 impl<'info> Initialize<'info> {
     pub fn init(&mut self, amount: u64) -> Result<()> {
@@ -25,13 +23,9 @@ impl<'info> Initialize<'info> {
                 to: self.vault.to_account_info(),
             },
         );
- 
+
         transfer(ctx, amount)?;
 
         Ok(())
     }
 }
-
-
-
- 
