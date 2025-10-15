@@ -12,7 +12,7 @@ use crate::{error::DiceError, state::Bet};
 pub const HOUSE_EDGE: u16 = 150; // 1.5% House edge
 
 #[derive(Accounts)]
-pub struct ResultBet<'info> {
+pub struct resolve_bet<'info> {
     #[account(mut)]
     pub house: Signer<'info>,
     #[account(mut)]
@@ -37,7 +37,7 @@ pub struct ResultBet<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> ResultBet<'info> {
+impl<'info> resolve_bet<'info> {
     pub fn verify_ed25519_signature(&mut self, sig: &[u8]) -> Result<()> {
         // Get the Ed25519 signature instruction
         let ix = load_instruction_at_checked(0, &self.instruction_sysvar.to_account_info())?;
@@ -87,7 +87,7 @@ impl<'info> ResultBet<'info> {
         Ok(())
     }
 
-    pub fn resolve_bet(&mut self, bumps: &ResultBetBumps, sig: &[u8]) -> Result<()> {
+    pub fn resolve_bet(&mut self, bumps: &ResolveBetBumps, sig: &[u8]) -> Result<()> {
         let hash = hash(sig).to_bytes();
         let mut hash_16: [u8; 16] = [0; 16];
         hash_16.copy_from_slice(&hash[0..16]);

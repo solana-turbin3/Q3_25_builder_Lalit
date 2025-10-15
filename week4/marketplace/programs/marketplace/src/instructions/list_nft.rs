@@ -108,7 +108,7 @@ impl<'info> ListNft<'info> {
 
         self.listing.set_inner(Listing {
             seller: self.seller.key(),
-            mint: self.nft.key(),
+            nft_mint: self.nft.key(),
             price,
             bump: bumps.listing,
             is_active: true,

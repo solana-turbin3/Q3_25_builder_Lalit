@@ -24,7 +24,7 @@ pub mod dice {
         ctx.accounts.deposit(amount)
     }
 
-    pub fn resolve_bet(ctx: Context<ResultBet>, sig: Vec<u8>) -> Result<()> {
+    pub fn resolve_bet(ctx: Context<ResolveBet>, sig: Vec<u8>) -> Result<()> {
         ctx.accounts.verify_ed25519_signature(&sig)?;
         ctx.accounts.resolve_bet(&ctx.bumps, &sig)
     }

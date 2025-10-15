@@ -2,14 +2,10 @@ use anchor_lang::prelude::*;
 
 #[account]
 #[derive(InitSpace)]
-pub struct Marketplace {
-
-    pub admin: Pubkey,
-
-    pub fee_percentage: u8,
- 
+pub struct Listing {
+    pub seller: Pubkey,
+    pub nft_mint: Pubkey,
+    pub price: u64,
+    pub is_active: bool,
     pub bump: u8,
-    
-    
-    pub treasury_bump: u8,
 }
